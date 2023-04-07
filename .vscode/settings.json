@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "proc.h": "c",
+        "syscall.h": "c",
+        "ostream": "c",
+        "ratio": "c",
+        "date.h": "c",
+        "defs.h": "c"
+    }
+}
