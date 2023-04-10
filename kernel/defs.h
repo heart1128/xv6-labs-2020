@@ -105,7 +105,8 @@ void            yield(void);
 int             either_copyout(int user_dst, uint64 dst, void *src, uint64 len);
 int             either_copyin(void *dst, int user_src, uint64 src, uint64 len);
 void            procdump(void);
-uint64          nproc(void); // 计算非UNUSED进程数量的函数
+uint64          nproc(void); // 计算非UNUSED进程数量的函数  lab2-2
+void            proc_freekpagetable(pagetable_t kpagetable); // lab3-2
 
 // swtch.S
 void            swtch(struct context*, struct context*);
@@ -158,7 +159,7 @@ int             uartgetc(void);
 // vm.c
 void            kvminit(void);
 void            kvminithart(void);
-uint64          kvmpa(uint64);
+uint64          kvmpa(pagetable_t, uint64); // lab3-2
 void            kvmmap(uint64, uint64, uint64, int);
 int             mappages(pagetable_t, uint64, uint64, uint64, int);
 pagetable_t     uvmcreate(void);
@@ -174,6 +175,8 @@ int             copyout(pagetable_t, uint64, char *, uint64);
 int             copyin(pagetable_t, char *, uint64, uint64);
 int             copyinstr(pagetable_t, char *, uint64, uint64);
 void            vmprint(pagetable_t pagetable); // lab3打印页表信息。
+pagetable_t     proc_kpagetable();         // 为内核分配一个新的页表，用来保存用户在内核的页表，就可以使用用户地址了，不然内核默认的页表是直接映射的。不能使用用户地址进行虚拟映射。
+void            uvmmap(pagetable_t pt,uint64 va, uint64 pa, uint64 sz, int perm);
 
 // plic.c
 void            plicinit(void);

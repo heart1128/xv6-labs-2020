@@ -165,8 +165,13 @@ kvmmap(uint64 va, uint64 pa, uint64 sz, int perm)
 // a physical address. only needed for
 // addresses on the stack.
 // assumes va is page aligned.
+// 虚拟内核地址转换为物理地址。
+// lab3-2
+// 要改动一下，调用的时候传入一个页表,把用户的内核页表传入，否则会出现panic(kvmpa)
+// 因为之前在procinit()把映射到全局的内核页表注释了，所以不会有这个操作
+// 也要在defs.h改下声明
 uint64
-kvmpa(uint64 va)
+kvmpa(pagetable_t kernel_pagetable, uint64 va)
 {
   uint64 off = va % PGSIZE;
   pte_t *pte;
@@ -231,21 +236,21 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
   uint64 a;
   pte_t *pte;
 
-  if((va % PGSIZE) != 0)
+  if((va % PGSIZE) != 0)  // 必须是PGSIZE的倍数
     panic("uvmunmap: not aligned");
 
   for(a = va; a < va + npages*PGSIZE; a += PGSIZE){
-    if((pte = walk(pagetable, a, 0)) == 0)
+    if((pte = walk(pagetable, a, 0)) == 0)//取出三级页表
       panic("uvmunmap: walk");
-    if((*pte & PTE_V) == 0)
+    if((*pte & PTE_V) == 0)     //判断有效
       panic("uvmunmap: not mapped");
-    if(PTE_FLAGS(*pte) == PTE_V)
+    if(PTE_FLAGS(*pte) == PTE_V)  
       panic("uvmunmap: not a leaf");
     if(do_free){
-      uint64 pa = PTE2PA(*pte);
-      kfree((void*)pa);
+      uint64 pa = PTE2PA(*pte); // 页表映射到物理地址
+      kfree((void*)pa);     // 释放。
     }
-    *pte = 0;
+    *pte = 0;  // 取消最后一级的映射
   }
 }
 
@@ -559,4 +564,60 @@ vmprint(pagetable_t pagetable)
   // 递归打印每层存的地址,一级页表开始
   // 系统初始化会分配两个page，一个是text段，一个是data段，具体看book
   _vmprint_helper(pagetable, 1);
+}
+
+
+/*
+lab3 : A kernel pagetable per process (hard)
+*/
+
+
+//也实现自己的uvmmap，在出错的时候可以定位
+void
+uvmmap(pagetable_t pt, uint64 va, uint64 pa, uint64 sz, int perm)
+{
+  if(mappages(pt, va, sz, pa, perm) != 0)
+    panic("uvmmap");
+}
+// 修改版本的kvminit，创建一个新的页表，而不是修改kernel_pagetable
+// 在proc.c中调用它
+// 模仿那个最上面的kvminit()
+pagetable_t
+proc_kpagetable()
+{
+  // 自己创建一个页表
+  pagetable_t uPagetable = uvmcreate();
+  memset(uPagetable, 0, PGSIZE);
+
+  // 添加基本的设备映射。
+  // uart registers
+  // 映射I/O设备，UARETO = 0x10000000L，看book中就是设备的起点
+  // 因为设备是虚拟地址和物理地址直接映射的，所以开始和结束都是UART0
+  uvmmap(uPagetable,UART0, UART0, PGSIZE, PTE_R | PTE_W);
+
+  // vmprint(kernel_pagetable);
+
+  // virtio mmio disk interface
+  // 同样
+  uvmmap(uPagetable, VIRTIO0, VIRTIO0, PGSIZE, PTE_R | PTE_W);
+
+  // CLINT
+  uvmmap(uPagetable, CLINT, CLINT, 0x10000, PTE_R | PTE_W);
+
+  // PLIC
+  uvmmap(uPagetable, PLIC, PLIC, 0x400000, PTE_R | PTE_W);
+
+  // map kernel text executable and read-only.
+  uvmmap(uPagetable, KERNBASE, KERNBASE, (uint64)etext-KERNBASE, PTE_R | PTE_X);
+
+  // map kernel data and the physical RAM we'll make use of.
+  uvmmap(uPagetable, (uint64)etext, (uint64)etext, PHYSTOP-(uint64)etext, PTE_R | PTE_W);
+
+  // map the trampoline for trap entry/exit to
+  // the highest virtual address in the kernel.
+  uvmmap(uPagetable, TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R | PTE_X);
+
+
+  // 返回创建的页表
+  return uPagetable;
 }

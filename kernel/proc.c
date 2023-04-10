@@ -36,18 +36,24 @@ procinit(void)
   initlock(&pid_lock, "nextpid");
   for(p = proc; p < &proc[NPROC]; p++) {
       initlock(&p->lock, "proc");
+// lab3-2
+// 这里是将每个进程的内核栈都映射到同一个全局页表中
+// 但是下面要在allocproc中将进程的内核栈都映射到进程自己的内核页中
+// 所以这里注释了
 
       // Allocate a page for the process's kernel stack.
       // Map it high in memory, followed by an invalid
       // guard page.
-      char *pa = kalloc();
-      if(pa == 0)
-        panic("kalloc");
-      uint64 va = KSTACK((int) (p - proc));
-      kvmmap(va, (uint64)pa, PGSIZE, PTE_R | PTE_W);
-      p->kstack = va;
+      // char *pa = kalloc();
+      // if(pa == 0)
+      //   panic("kalloc");
+      // uint64 va = KSTACK((int) (p - proc));
+      // // 添加映射到全局的一个内核页表
+      // kvmmap(va, (uint64)pa, PGSIZE, PTE_R | PTE_W);
+      // p->kstack = va;
   }
-  kvminithart();
+  // 设置stap寄存器，刷新TLB
+  kvminithart(); 
 }
 
 // Must be called with interrupts disabled,
@@ -95,6 +101,7 @@ allocpid() {
 // If found, initialize state required to run in the kernel,
 // and return with p->lock held.
 // If there are no free procs, or a memory allocation fails, return 0.
+// 查找没有进内核页表的进程，也就是未使用的，如果有就映射内核栈
 static struct proc*
 allocproc(void)
 {
@@ -126,16 +133,41 @@ found:
     release(&p->lock);
     return 0;
   }
+  // lab3-2
+  // 为用户分配的复制用户页表的成员
+  // 出错要释放，模仿上面的页表分配。
+  p->kpagetable = proc_kpagetable();
+  if(0 == p->kpagetable)
+  {
+    freeproc(p);
+    release(&p->lock);
+    return 0;
+  }
+
+  // lab3-2
+  // 这块是上面procinit()函数的内容
+  // 作用是初始化锁，让后将每个进程的栈映射到全局的内核页表中
+  // 本来设计的是只用一个全局的内核页表给所有进程使用  
+  // 模仿上面的，将每个进程的的内核栈映射到内核页中，他们是映射到同一个物理地址的。
+  // 分配物理内存作为内核栈映射的物理地址
+  char *pa = kalloc();
+  if(pa == 0)
+    panic("kalloc");
+  // 栈的虚拟地址位置，栈是内核态独有的
+  // (((1L << (9 + 9 + 9 + 12 - 1)) - 4096) - (((int)(p - proc))+1)* 2*4096)
+  // 前者是kstack的地址，就是MAXVA-trampoline的位置
+  // 后者要跳过p之前的进程内核栈地址大小，也就是p-proc的距离*PGSIZ*2（2是因为kstack中间有Guard page）
+  uint64 va = KSTACK((int)(p - proc));
+  // 物理地址映射到栈的虚拟地址
+  uvmmap(p->kpagetable, va, (uint64)pa, PGSIZE, PTE_R | PTE_W);
+  p->kstack = va;  // 添加到进程的内核栈中。
+
 
   // Set up new context to start executing at forkret,
   // which returns to user space.
   memset(&p->context, 0, sizeof(p->context));
   p->context.ra = (uint64)forkret;
-  p->context.sp = p->kstack + PGSIZE;
-
-  // 初始化一个进程空间的时候，设置mask的默认值，防止垃圾数据
-  p->mask = 0;
-
+  p->context.sp = p->kstack + PGSIZE; // 设置栈顶指针
   return p;
 }
 
@@ -145,12 +177,25 @@ found:
 static void
 freeproc(struct proc *p)
 {
-  if(p->trapframe)
+  if(p->trapframe)              // 释放寄存器，PGSIZE大小
     kfree((void*)p->trapframe);
   p->trapframe = 0;
-  if(p->pagetable)
+  if(p->pagetable)              // 释放页表
     proc_freepagetable(p->pagetable, p->sz);
   p->pagetable = 0;
+
+  // lab3-2
+  // 释放用户页表的内核栈，因为内核栈是在内核中才有的，清除物理内存不影响用户
+  // 要先释放栈，不然页表释放了栈就找不到了。
+  if(p->kstack)
+    uvmunmap(p->kpagetable, p->kstack, 1, 1);
+  p->kstack = 0;
+  // 释放用户的内核页表
+  if(p->kpagetable)
+    proc_freekpagetable(p->kpagetable); // 不传p->sz,因为不清除物理内存
+  p->kpagetable = 0;
+
+
   p->sz = 0;
   p->pid = 0;
   p->parent = 0;
@@ -200,9 +245,41 @@ proc_pagetable(struct proc *p)
 void
 proc_freepagetable(pagetable_t pagetable, uint64 sz)
 {
+  //取消TRAMPOLINE的映射 1是npages, 最后一个数字表示是否释放物理内存。
   uvmunmap(pagetable, TRAMPOLINE, 1, 0);
   uvmunmap(pagetable, TRAPFRAME, 1, 0);
+  // 先释放物理内存，然后释放页表。
+  // 会调用freewalk释放所有的页表。这里需要改写下，不释放物理内存页面
+  // sz表示释放的物理内存的大小，如果不释放物理内存就设置为0
   uvmfree(pagetable, sz);
+}
+
+// lab3-2
+// 模仿proc_freepagetable释放用户内核页表但是不释放物理内存
+// 因为这里是在内核态使用了用户的内核页表，之后还要转换回用户态，。
+// 如果把页表映射的物理内存释放了，用户态原本的页表就找不到映射了。
+// 但是在内核态申请的内核栈的物理内存可以释放。因为这是内核态独有的
+// 注意是内核栈的物理地址，不是内核栈映射的物理地址，因为内核栈映射的物理
+// 地址和用户在内核中的内核页表是映射在同一个物理地址的。
+// 内核页表释放了，也可以把整个页表都取消映射，包括I/O
+void
+proc_freekpagetable(pagetable_t kpagetable)
+{
+  uvmunmap(kpagetable, TRAMPOLINE, 1, 0);
+  // uvmunmap(kpagetable, TRAPFRAME, 1, 0);
+
+  // 对应vm.c的proc_kpagetable()取消映射,但是不能释放物理内存
+  uvmunmap(kpagetable, UART0, 1, 0);
+  uvmunmap(kpagetable, VIRTIO0, 1 , 0);
+  uvmunmap(kpagetable, CLINT, 0x10000 / PGSIZE, 0);
+  uvmunmap(kpagetable, PLIC, 0x400000 / PGSIZE, 0);
+  // 这段是内核页表放text,data，freememory的地方。
+  uvmunmap(kpagetable, KERNBASE, (PHYSTOP - KERNBASE) / PGSIZE, 0);
+
+  // 会调用freewalk清除三级页表
+  // 设置0在调用uvmunmap中不会将页表对应的物理内存清除。
+  uvmfree(kpagetable, 0);
+
 }
 
 // a user program that calls exec("/init")
@@ -483,7 +560,8 @@ scheduler(void)
   struct cpu *c = mycpu();
   
   c->proc = 0;
-  for(;;){
+  // 死循环找可运行的进程运行。
+  for(;;){ 
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
     
@@ -496,7 +574,27 @@ scheduler(void)
         // before jumping back to us.
         p->state = RUNNING;
         c->proc = p;
+
+        // lab3-2
+        // swtch之后进程就已经执行完了。
+        // 在执行之前需要把用户在内核中的内核表加载到stap寄存器
+        // 在执行的时候就会加载这个用户的内核页表进行地址映射
+        // 模仿kvminithart()就行
+        w_satp(MAKE_SATP(p->kpagetable));
+        sfence_vma(); // 刷新TLB使得上面有效。
+
+
+      // # Context switch
+      // #
+      // #   void swtch(struct context *old, struct context *new);
+      // # 
+      // # Save current registers in old. Load from new.	
         swtch(&c->context, &p->context);
+
+        // 进程运行完了
+        // lab3-2
+        // 没有进程运行的时候要切换回全局的内核页表。
+        kvminithart();
 
         // Process is done running for now.
         // It should have changed its p->state before coming back.
@@ -506,10 +604,16 @@ scheduler(void)
       }
       release(&p->lock);
     }
-    if(found == 0) {
+#if !defined(LAB_FS)
+    if(found == 0)
+    {
       intr_on();
       asm volatile("wfi");
     }
+#else
+    ;
+#endif
+
   }
 }
 

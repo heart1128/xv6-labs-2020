@@ -106,6 +106,7 @@ struct proc {
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
   /*
+  lab3-2
   xv6 中，每个进程都有一个自己的用户空间页表，这个页表只包含该进程的用户地址空间的映射。
   在内核中有一个单独的内核页表，所有的进程进入内核态后，都是用的是这个内核页表。
   所以用户地址在内核中是无法使用的，因为内核页表中没有对该地址的映射，

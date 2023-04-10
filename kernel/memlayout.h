@@ -49,11 +49,12 @@
 
 // map the trampoline page to the highest address,
 // in both user and kernel space.
-#define TRAMPOLINE (MAXVA - PGSIZE)
+#define TRAMPOLINE (MAXVA - PGSIZE)   // trampoline占一个PGSIZE，所以开始地址是MAXVA-PGSIZE
 
 // map kernel stacks beneath the trampoline,
 // each surrounded by invalid guard pages.
-#define KSTACK(p) (TRAMPOLINE - ((p)+1)* 2*PGSIZE)
+#define KSTACK(p) (TRAMPOLINE - ((p)+1)* 2*PGSIZE) // 虚拟地址中，trampoline下面就是kstack开始。进程位置就是已经分配的kstack的个数*PGSIZE*2（guard page）
+
 
 // User memory layout.
 // Address zero first:

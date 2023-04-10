@@ -36,7 +36,7 @@ main()
       ;
     __sync_synchronize();
     printf("hart %d starting\n", cpuid());
-    kvminithart();    // turn on paging
+    kvminithart();    // turn on paging  设置一级页表到stap寄存器，全局的内核页表
     trapinithart();   // install kernel trap vector
     plicinithart();   // ask PLIC for device interrupts
   }
