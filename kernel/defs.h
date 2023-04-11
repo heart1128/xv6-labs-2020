@@ -156,6 +156,13 @@ void            uartputc(int);
 void            uartputc_sync(int);
 int             uartgetc(void);
 
+// vmcopyin.c  lab3-3
+int             copyin_new(pagetable_t, char*, uint64, uint64);// lab3-3替代vm.c的copyin()
+int             copyinstr_new(pagetable_t, char*, uint64, uint64);// lab3-3替代vm.c的copyinstr
+
+// sprintf.c    lab3-3
+int             snprintf(char *buf, int sz, char *fmt, ...); // used in vmcopyin.c
+
 // vm.c
 void            kvminit(void);
 void            kvminithart(void);
@@ -190,8 +197,6 @@ void            virtio_disk_init(void);
 void            virtio_disk_rw(struct buf *, int);
 void            virtio_disk_intr(void);
 
-// vmcopyin.c
-int             copyin_new(pagetable_t, char*, uint64, uint64);// lab3-3替代vm.c的copyin()
-int             copyinstr_new(pagetable_t, char*, uint64, uint64);// lab3-3替代vm.c的copyinstr
+
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))
