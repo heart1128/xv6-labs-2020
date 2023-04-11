@@ -119,13 +119,23 @@ exec(char *path, char **argv)
   safestrcpy(p->name, last, sizeof(p->name));
     
   // Commit to the user image.
+  // 新的进程替换原用户页表
   oldpagetable = p->pagetable;
   p->pagetable = pagetable;
   p->sz = sz;
   p->trapframe->epc = elf.entry;  // initial program counter = main
   p->trapframe->sp = sp; // initial stack pointer
-  proc_freepagetable(oldpagetable, oldsz);
+  proc_freepagetable(oldpagetable, oldsz);  // 释放原用户的页表
 
+  // lab3-3
+  // 清除原用户页表在用户内核页表中的映射，然后重新进行页表的复制，新的页表复制到用户内核页表
+  // 0开始全部清除，虚拟地址的页表都是0开始的，因为还要使用，所以最后一个不为1
+  uvmunmap(p->kpagetable, 0, PGROUNDUP(oldsz) / PGSIZE, 0);
+  // 进行复制。
+  if(ukvmcopy(p->pagetable, p->kpagetable, 0, p->sz) < 0)
+    goto bad;
+  
+  // lab3-1
   // 自己加的，打印页表的信息，定义在vm.c中
   // 为什么放在exec函数中？因为在初始化initcode.asm看到，每次程序运行的入口通过initcode，然后执行系统调用SYS_exec才执行，
   // 所以每次都会打印出来

@@ -176,7 +176,8 @@ int             copyin(pagetable_t, char *, uint64, uint64);
 int             copyinstr(pagetable_t, char *, uint64, uint64);
 void            vmprint(pagetable_t pagetable); // lab3打印页表信息。
 pagetable_t     proc_kpagetable();         // 为内核分配一个新的页表，用来保存用户在内核的页表，就可以使用用户地址了，不然内核默认的页表是直接映射的。不能使用用户地址进行虚拟映射。
-void            uvmmap(pagetable_t pt,uint64 va, uint64 pa, uint64 sz, int perm);
+void            uvmmap(pagetable_t ,uint64 , uint64 , uint64 , int );
+int             ukvmcopy(pagetable_t, pagetable_t , uint64 , uint64 );// lab3-3，模拟uvmcopy函数，将用户页表复制到用户内核页表中
 
 // plic.c
 void            plicinit(void);

@@ -324,6 +324,7 @@ userinit(void)
 // Return 0 on success, -1 on failure.
 //sbrk 是 一 个 进 程 收 缩 或 增 长 内 存 的 系 统 调 用 。 该 系 统 调 用 由 函 数growproc实现
 // growproc 调用 uvmalloc 或 uvmdealloc，取决于 n 是正数还是负数
+// 由SYS_sbrk系统调用来调用这个函数
 int
 growproc(int n)
 {
@@ -332,19 +333,32 @@ growproc(int n)
 
   sz = p->sz;
   if(n > 0){
+      // lab3-3
+    // 同样kpagetable也要加减
+    // 但是根据提示，用户进程页表最大不能超过PLIC
+    // 所以加一个判断
+    if(sz + n > PLIC)
+      return -1;
+
     // uvmalloc通过 kalloc 分配物理内存，并使用 mappages 将 PTE 添加到用户页表中
     if((sz = uvmalloc(p->pagetable, sz, sz + n)) == 0) {
       return -1;
     }
+
+    // lab3-3
+    // 增长完n的大小之后，要把增长的部分使用自定义的ukvmcopy()复制到用户的内核页表中
+    
   } else if(n < 0){
+    // n< 0 表示缩减
     // 使用 walk 来查找 PTE 并使用 kfree 来释放它们所引用的物理内存。
     sz = uvmdealloc(p->pagetable, sz, sz + n);
   }
+
   p->sz = sz;
-  return 0;
+  return 0; 
 }
 
-// Create a new process, copying the parent.
+// Create a new process, copying the parent. 
 // Sets up child kernel stack to return as if from fork() system call.
 int
 fork(void)
@@ -364,7 +378,17 @@ fork(void)
     release(&np->lock);
     return -1;
   }
+
   np->sz = p->sz;
+
+  // lab3-3
+  // 复制子进程的用户页表到用户内核页表。
+  if(ukvmcopy(np->pagetable, np->kpagetable, 0, np->sz) < 0)
+  {
+    freeproc(np);
+    release(&np->lock);
+    return -1;
+  }
 
   np->parent = p;
 
@@ -388,7 +412,7 @@ fork(void)
   pid = np->pid;
 
   np->state = RUNNABLE;
-
+  // lab 2-2
   // 这里是自己加的部分，为了用trace追踪fork系统调用，设置mask
   // 系统调用都要经过fork, 继承父进程的mask
   // trace执行的时候已经是系统fork()出来的进程在运行了。

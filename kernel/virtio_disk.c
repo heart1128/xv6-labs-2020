@@ -203,7 +203,7 @@ virtio_disk_rw(struct buf *b, int write)
   buf0.sector = sector;
 
   // buf0 is on a kernel stack, which is not direct mapped,
-  // thus the call to kvmpa().
+  // thus the call to kvmpa().  
   // lab3-2 传入用户的内核页表
   disk.desc[idx[0]].addr = (uint64) kvmpa(myproc()->kpagetable,(uint64) &buf0);
   disk.desc[idx[0]].len = sizeof(buf0);

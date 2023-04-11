@@ -135,17 +135,18 @@ walkaddr(pagetable_t pagetable, uint64 va)
   pte_t *pte;
   uint64 pa;
 
+  // 虚拟地址超过范围了
   if(va >= MAXVA)
     return 0;
-
+  // 找到虚拟地址的最后一级页表
   pte = walk(pagetable, va, 0);
   if(pte == 0)
     return 0;
-  if((*pte & PTE_V) == 0)
+  if((*pte & PTE_V) == 0) // 页无效
     return 0;
-  if((*pte & PTE_U) == 0)
+  if((*pte & PTE_U) == 0) // 用户不可用
     return 0;
-  pa = PTE2PA(*pte);
+  pa = PTE2PA(*pte); //转换为物理地址
   return pa;
 }
 
@@ -230,6 +231,7 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
 // Remove npages of mappings starting from va. va must be
 // page-aligned. The mappings must exist.
 // Optionally free the physical memory.
+// 取消虚拟地址的映
 void
 uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
 {
@@ -391,6 +393,7 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
     if((mem = kalloc()) == 0)
       goto err;
     memmove(mem, (char*)pa, PGSIZE);
+    // 一个用户虚拟地址是从0开始的
     if(mappages(new, i, PGSIZE, (uint64)mem, flags) != 0){
       kfree(mem);
       goto err;
@@ -402,6 +405,42 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   uvmunmap(new, 0, i / PGSIZE, 1);
   return -1;
 }
+
+// lab3-3，模拟uvmcopy函数，将用户页表复制到用户内核页表中
+int
+ukvmcopy(pagetable_t upagetable, pagetable_t kpagetable, uint64 begin, uint64 end)
+{
+  pte_t *pte;
+  uint64 pa, i;
+  uint flags;
+  // 向上取整开始为4096倍数，不向下是因为低地址已经被使用了
+  uint64 begin_page = PGROUNDUP(begin);
+  for(i = begin; i < end; i += PGSIZE)
+  {
+    // 找到用户页表的三级页表
+    if((pte = walk(upagetable, i, 0)) == 0)
+      panic("ukvmcopy: pte should exist");
+    // 判断有效性
+    if((*pte & PTE_V) == 0)
+      panic("ukvmcopy: page not present");
+    // 取出真实地址和标志位
+    pa = PTE2PA(*pte);
+    flags = PTE_FLAGS(*pte);
+    // 因为在内核中，带有PTE_U标志不能访问，所以这里复制过来的标志要把PTE_U标志去掉
+    // PTE_U只有一位是1,其他全部是0,只要取反在与就能去掉这个标志位
+    flags &= (~PTE_U);
+    // uvmcopy这里是分配了一个页，但是这里kpagetable已经存在了，直接映射
+    // 映射用户页表指向的物理地址到用户内核页表
+    if(mappages(kpagetable, i, PGSIZE, pa, flags) != 0)
+      goto err;
+  }
+
+err:
+  // 映射错误要取消前面映射的所有PTE
+  uvmunmap(kpagetable, begin_page, (i - begin_page) / PGSIZE, 0);
+}
+
+
 
 // mark a PTE invalid for user access.
 // used by exec for the user stack guard page.
@@ -444,27 +483,39 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 // Copy from user to kernel.
 // Copy len bytes to dst from virtual address srcva in a given page table.
 // Return 0 on success, -1 on error.
+// 读取用户指针指向的内存，通过这个指针转换为内核可以直接解引用的物理地址
 int
 copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
 {
-  uint64 n, va0, pa0;
 
-  while(len > 0){
-    va0 = PGROUNDDOWN(srcva);
-    pa0 = walkaddr(pagetable, va0);
-    if(pa0 == 0)
-      return -1;
-    n = PGSIZE - (srcva - va0);
-    if(n > len)
-      n = len;
-    memmove(dst, (void *)(pa0 + (srcva - va0)), n);
+  // lab3-3
+// 使用copyin_new替代copy，将用户进程的页表复制到lab3-2的创建的用户内核页表中，就可以直接解引用物理地址。
+  return cpoyin_new(pagetable,dst,srcva,len);
+  // uint64 n, va0, pa0;
 
-    len -= n;
-    dst += n;
-    srcva = va0 + PGSIZE;
-  }
-  return 0;
+  // while(len > 0){
+  //   va0 = PGROUNDDOWN(srcva);      //需要4096倍数,向下取整
+  //   pa0 = walkaddr(pagetable, va0);//里面调用walk找到最后一级页表。并且在最后一级页表中找到映射的物理地址。
+  //   if(pa0 == 0)
+  //     return -1;
+    
+  //   // PGSIZE - 向下取整的数， 
+  //   n = PGSIZE - (srcva - va0); 
+  //   if(n > len)
+  //     n = len;
+  //   // 复制从(pa0 + (srcva - va0))开始复制长度为n的内存到dst
+  //   // 最开始srcva-va0 = 0，之后每次srcva + PGSIZE,也就是每次移动一个PGSIZE一个PTE
+  //   memmove(dst, (void *)(pa0 + (srcva - va0)), n);
+
+  //   len -= n;
+  //   dst += n;
+  //   // 每次走一个PGSIZE
+  //   srcva = va0 + PGSIZE;
+  // }
+  // return 0;
 }
+
+
 
 // Copy a null-terminated string from user to kernel.
 // Copy bytes to dst from virtual address srcva in a given page table,
