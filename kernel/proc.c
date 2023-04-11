@@ -348,13 +348,15 @@ growproc(int n)
       return -1;
 
     // uvmalloc通过 kalloc 分配物理内存，并使用 mappages 将 PTE 添加到用户页表中
+    // 返回的是sz + n
     if((sz = uvmalloc(p->pagetable, sz, sz + n)) == 0) {
       return -1;
     }
 
     // lab3-3
     // 增长完n的大小之后，要把增长的部分使用自定义的ukvmcopy()复制到用户的内核页表中
-    ukvmcopy(p->pagetable, p->kpagetable, sz, sz  + n);
+    // sz是新p->sz + n , 从p->sz 开始 复制到 p->sz + n
+    ukvmcopy(p->pagetable, p->kpagetable, p->sz, sz);
 
     
   } else if(n < 0){
