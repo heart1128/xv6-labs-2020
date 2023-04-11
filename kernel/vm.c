@@ -434,10 +434,12 @@ ukvmcopy(pagetable_t upagetable, pagetable_t kpagetable, uint64 begin, uint64 en
     if(mappages(kpagetable, i, PGSIZE, pa, flags) != 0)
       goto err;
   }
+  return 0;
 
 err:
   // 映射错误要取消前面映射的所有PTE
   uvmunmap(kpagetable, begin_page, (i - begin_page) / PGSIZE, 0);
+  return -1;
 }
 
 

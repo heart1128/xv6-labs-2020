@@ -309,7 +309,11 @@ userinit(void)
   p->sz = PGSIZE;
 
   // lab3-3 第一个进程的页表也要拷贝到用户内核页表中。
-  ukvmcopy(p->pagetable, p->kpagetable, 0 , p->sz);
+  if(ukvmcopy(p->pagetable, p->kpagetable, 0 , p->sz) < 0)
+  {
+      panic("ukvmcopy userinit");
+      return;
+  }
 
   // prepare for the very first "return" from kernel to user.
   p->trapframe->epc = 0;      // user program counter
