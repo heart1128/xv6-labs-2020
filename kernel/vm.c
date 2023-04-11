@@ -525,7 +525,7 @@ int
 copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 {
     // lab3-3使用vmcopyin.c/copyinstr_new替代
-    copyinstr_new(pagetable, dst, srcva, max);
+    return copyinstr_new(pagetable, dst, srcva, max);
 //  uint64 n, va0, pa0;
 //  int got_null = 0;
 //
