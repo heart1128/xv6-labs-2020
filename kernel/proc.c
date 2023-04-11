@@ -308,6 +308,9 @@ userinit(void)
   uvminit(p->pagetable, initcode, sizeof(initcode));
   p->sz = PGSIZE;
 
+  // lab3-3 第一个进程的页表也要拷贝到用户内核页表中。
+  ukvmcopy(p->pagetable, p->kpagetable, 0 , p->sz);
+
   // prepare for the very first "return" from kernel to user.
   p->trapframe->epc = 0;      // user program counter
   p->trapframe->sp = PGSIZE;  // user stack pointer
@@ -347,11 +350,26 @@ growproc(int n)
 
     // lab3-3
     // 增长完n的大小之后，要把增长的部分使用自定义的ukvmcopy()复制到用户的内核页表中
+    ukvmcopy(p->pagetable, p->kpagetable, sz, sz  + n);
+
     
   } else if(n < 0){
-    // n< 0 表示缩减
+    // n < 0 表示缩减
     // 使用 walk 来查找 PTE 并使用 kfree 来释放它们所引用的物理内存。
     sz = uvmdealloc(p->pagetable, sz, sz + n);
+
+    // lab3-3
+    // 缩减之后也要进行在用户内核页表中缩减，但是不能直接使用uvdealloc,因为这个函数最终会释放物理内存
+    // 而用户内核页表不能释放物理内存。
+    // 所以这里模仿uvmdealloc取缩减页表项
+    uint oldsz = sz;
+    uint newsz = sz + n;
+      if(PGROUNDUP(newsz) < PGROUNDUP(oldsz)){
+          int npages = (PGROUNDUP(oldsz) - PGROUNDUP(newsz)) / PGSIZE;
+          // 这里在uvmdealloc是最后设置为1表示释放物理内存，重写就要设置为0
+          // uvmunmap(p->kpagetable, PGROUNDUP(newsz), npages, 1);
+          uvmunmap(p->kpagetable, PGROUNDUP(newsz), npages, 0);
+      }
   }
 
   p->sz = sz;
