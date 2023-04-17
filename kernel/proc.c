@@ -157,7 +157,10 @@ found:
   // (((1L << (9 + 9 + 9 + 12 - 1)) - 4096) - (((int)(p - proc))+1)* 2*4096)
   // 前者是kstack的地址，就是MAXVA-trampoline的位置
   // 后者要跳过p之前的进程内核栈地址大小，也就是p-proc的距离*PGSIZ*2（2是因为kstack中间有Guard page）
-  uint64 va = KSTACK((int)(p - proc));
+  // uint64 va = KSTACK((int)(p - proc));
+
+  
+  uint64 va = KSTACK(0);
   // 物理地址映射到栈的虚拟地址
   uvmmap(p->kpagetable, va, (uint64)pa, PGSIZE, PTE_R | PTE_W);
   p->kstack = va;  // 添加到进程的内核栈中。
@@ -183,6 +186,14 @@ freeproc(struct proc *p)
   if(p->pagetable)              // 释放页表
     proc_freepagetable(p->pagetable, p->sz);
   p->pagetable = 0;
+  p->sz = 0;
+  p->pid = 0;
+  p->parent = 0;
+  p->name[0] = 0;
+  p->chan = 0;
+  p->killed = 0;
+  p->xstate = 0;
+  
 
   // lab3-2
   // 释放用户页表的内核栈，因为内核栈是在内核中才有的，清除物理内存不影响用户
@@ -193,16 +204,8 @@ freeproc(struct proc *p)
   // 释放用户的内核页表
   if(p->kpagetable)
     proc_freekpagetable(p->kpagetable); // 不传p->sz,因为不清除物理内存
+
   p->kpagetable = 0;
-
-
-  p->sz = 0;
-  p->pid = 0;
-  p->parent = 0;
-  p->name[0] = 0;
-  p->chan = 0;
-  p->killed = 0;
-  p->xstate = 0;
   p->state = UNUSED;
 }
 
@@ -265,7 +268,7 @@ proc_freepagetable(pagetable_t pagetable, uint64 sz)
 void
 proc_freekpagetable(pagetable_t kpagetable)
 {
-  uvmunmap(kpagetable, TRAMPOLINE, 1, 0);
+  
   // uvmunmap(kpagetable, TRAPFRAME, 1, 0);
 
   // 对应vm.c的proc_kpagetable()取消映射,但是不能释放物理内存
@@ -275,6 +278,7 @@ proc_freekpagetable(pagetable_t kpagetable)
   uvmunmap(kpagetable, PLIC, 0x400000 / PGSIZE, 0);
   // 这段是内核页表放text,data，freememory的地方。
   uvmunmap(kpagetable, KERNBASE, (PHYSTOP - KERNBASE) / PGSIZE, 0);
+  uvmunmap(kpagetable, TRAMPOLINE, 1, 0);
 
   // 会调用freewalk清除三级页表
   // 设置0在调用uvmunmap中不会将页表对应的物理内存清除。
@@ -348,15 +352,15 @@ growproc(int n)
       return -1;
 
     // uvmalloc通过 kalloc 分配物理内存，并使用 mappages 将 PTE 添加到用户页表中
-    // 返回的是sz + n
     if((sz = uvmalloc(p->pagetable, sz, sz + n)) == 0) {
       return -1;
     }
 
     // lab3-3
     // 增长完n的大小之后，要把增长的部分使用自定义的ukvmcopy()复制到用户的内核页表中
-    // sz是新p->sz + n , 从p->sz 开始 复制到 p->sz + n
-    ukvmcopy(p->pagetable, p->kpagetable, p->sz, sz);
+    // 
+    if(ukvmcopy(p->pagetable, p->kpagetable, p->sz, sz) < 0)
+      return -1;
 
     
   } else if(n < 0){
@@ -368,8 +372,8 @@ growproc(int n)
     // 缩减之后也要进行在用户内核页表中缩减，但是不能直接使用uvdealloc,因为这个函数最终会释放物理内存
     // 而用户内核页表不能释放物理内存。
     // 所以这里模仿uvmdealloc取缩减页表项
-    uint oldsz = sz;
-    uint newsz = sz + n;
+    uint oldsz = p->sz;
+    uint newsz = sz;
       if(PGROUNDUP(newsz) < PGROUNDUP(oldsz)){
           int npages = (PGROUNDUP(oldsz) - PGROUNDUP(newsz)) / PGSIZE;
           // 这里在uvmdealloc是最后设置为1表示释放物理内存，重写就要设置为0
@@ -639,11 +643,6 @@ scheduler(void)
       // # Save current registers in old. Load from new.	
         swtch(&c->context, &p->context);
 
-        // 进程运行完了
-        // lab3-2
-        // 没有进程运行的时候要切换回全局的内核页表。
-        kvminithart();
-
         // Process is done running for now.
         // It should have changed its p->state before coming back.
         c->proc = 0;
@@ -651,6 +650,13 @@ scheduler(void)
         found = 1;
       }
       release(&p->lock);
+    }
+    if(found == 0)
+    {
+        // 进程运行完了
+        // lab3-2
+        // 没有进程运行的时候要切换回全局的内核页表。
+        kvminithart();
     }
 #if !defined(LAB_FS)
     if(found == 0)

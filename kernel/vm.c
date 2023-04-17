@@ -340,6 +340,7 @@ uvmdealloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 void
 freewalk(pagetable_t pagetable)
 {
+  // vmprint(pagetable);
   // there are 2^9 = 512 PTEs in a page table.
   // 遍历页表每个项
   for(int i = 0; i < 512; i++){
@@ -415,7 +416,7 @@ ukvmcopy(pagetable_t upagetable, pagetable_t kpagetable, uint64 begin, uint64 en
   uint flags;
   // 向上取整开始为4096倍数，不向下是因为低地址已经被使用了
   uint64 begin_page = PGROUNDUP(begin);
-  for(i = begin; i < end; i += PGSIZE)
+  for(i = begin_page; i < end; i += PGSIZE)
   {
     // 找到用户页表的三级页表
     if((pte = walk(upagetable, i, 0)) == 0)
@@ -530,7 +531,7 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
     return copyinstr_new(pagetable, dst, srcva, max);
 //  uint64 n, va0, pa0;
 //  int got_null = 0;
-//
+
 //  while(got_null == 0 && max > 0){
 //    va0 = PGROUNDDOWN(srcva);
 //    pa0 = walkaddr(pagetable, va0);
@@ -539,7 +540,7 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 //    n = PGSIZE - (srcva - va0);
 //    if(n > max)
 //      n = max;
-//
+
 //    char *p = (char *) (pa0 + (srcva - va0));
 //    while(n > 0){
 //      if(*p == '\0'){
@@ -554,7 +555,7 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 //      p++;
 //      dst++;
 //    }
-//
+
 //    srcva = va0 + PGSIZE;
 //  }
 //  if(got_null){
@@ -623,7 +624,7 @@ vmprint(pagetable_t pagetable)
 
 
 /*
-lab3 : A kernel pagetable per process (hard)
+lab3-2: A kernel pagetable per process (hard)
 */
 
 
@@ -641,38 +642,39 @@ pagetable_t
 proc_kpagetable()
 {
   // 自己创建一个页表
-  pagetable_t uPagetable = uvmcreate();
-  memset(uPagetable, 0, PGSIZE);
+  pagetable_t kpagetable = uvmcreate();
+  if(kpagetable == 0)
+    return 0;
 
   // 添加基本的设备映射。
   // uart registers
   // 映射I/O设备，UARETO = 0x10000000L，看book中就是设备的起点
   // 因为设备是虚拟地址和物理地址直接映射的，所以开始和结束都是UART0
-  uvmmap(uPagetable,UART0, UART0, PGSIZE, PTE_R | PTE_W);
+  uvmmap(kpagetable,UART0, UART0, PGSIZE, PTE_R | PTE_W);
 
   // vmprint(kernel_pagetable);
 
   // virtio mmio disk interface
   // 同样
-  uvmmap(uPagetable, VIRTIO0, VIRTIO0, PGSIZE, PTE_R | PTE_W);
+  uvmmap(kpagetable, VIRTIO0, VIRTIO0, PGSIZE, PTE_R | PTE_W);
 
   // CLINT
-  uvmmap(uPagetable, CLINT, CLINT, 0x10000, PTE_R | PTE_W);
+  uvmmap(kpagetable, CLINT, CLINT, 0x10000, PTE_R | PTE_W);
 
   // PLIC
-  uvmmap(uPagetable, PLIC, PLIC, 0x400000, PTE_R | PTE_W);
+  uvmmap(kpagetable, PLIC, PLIC, 0x400000, PTE_R | PTE_W);
 
   // map kernel text executable and read-only.
-  uvmmap(uPagetable, KERNBASE, KERNBASE, (uint64)etext-KERNBASE, PTE_R | PTE_X);
+  uvmmap(kpagetable, KERNBASE, KERNBASE, (uint64)etext-KERNBASE, PTE_R | PTE_X);
 
   // map kernel data and the physical RAM we'll make use of.
-  uvmmap(uPagetable, (uint64)etext, (uint64)etext, PHYSTOP-(uint64)etext, PTE_R | PTE_W);
+  uvmmap(kpagetable, (uint64)etext, (uint64)etext, PHYSTOP-(uint64)etext, PTE_R | PTE_W);
 
   // map the trampoline for trap entry/exit to
   // the highest virtual address in the kernel.
-  uvmmap(uPagetable, TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R | PTE_X);
+  uvmmap(kpagetable, TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R | PTE_X);
 
 
   // 返回创建的页表
-  return uPagetable;
+  return kpagetable;
 }
