@@ -9,7 +9,7 @@
 .align 4
 kernelvec:
         // 内核在cpu上执行，内核将stvec指向kernelvec上的汇编代码
-        // make room to save registers.‘
+        // make room to save registers.
         // 下面保存所有寄存器，也就是中断的保护现场
         addi sp, sp, -256
 
