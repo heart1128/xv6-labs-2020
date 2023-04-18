@@ -114,6 +114,8 @@ w_mie(uint64 x)
 // machine exception program counter, holds the
 // instruction address to which a return from
 // exception will go.
+// 特权指令下：sepc寄存器：当trap发生时，RISC-V会将程序计数器保存在这里（因为PC会被stvec覆盖）。
+//              sret（从trap中返回）指令将sepc复制到pc中。内核可以写sepc来控制sret的返回到哪里。
 static inline void 
 w_sepc(uint64 x)
 {
@@ -160,6 +162,7 @@ w_mideleg(uint64 x)
 
 // Supervisor Trap-Vector Base Address
 // low two bits are mode.
+// 特权指令下： stvec寄存器：内核在这里写下trap处理程序的地址；RISC-V跳转到这里处理trap.
 static inline void 
 w_stvec(uint64 x)
 {
@@ -203,6 +206,8 @@ r_satp()
 }
 
 // Supervisor Scratch register, for early trap handler in trampoline.S.
+// sstatus中的SIE位控制设备中断是否被启用，如果内核清除SIE，RISC-V将推迟设备中断，
+// 特权指令下：直到内核设置SIE。SPP位表示trap是来自用户模式还是supervisor模式，并控制sret返回到什么模式。
 static inline void 
 w_sscratch(uint64 x)
 {
@@ -216,6 +221,7 @@ w_mscratch(uint64 x)
 }
 
 // Supervisor Trap Cause
+//特权指令下： scause寄存器：RISC -V在这里放了一个数字，描述了trap的原因。
 static inline uint64
 r_scause()
 {

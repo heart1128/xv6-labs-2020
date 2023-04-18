@@ -8,7 +8,9 @@
 .globl kernelvec
 .align 4
 kernelvec:
-        // make room to save registers.
+        // 内核在cpu上执行，内核将stvec指向kernelvec上的汇编代码
+        // make room to save registers.‘
+        // 下面保存所有寄存器，也就是中断的保护现场
         addi sp, sp, -256
 
         // save the registers.
@@ -46,6 +48,7 @@ kernelvec:
 
 	// call the C trap handler in trap.c
         call kerneltrap
+        // 处理完中断之后恢复栈堆
 
         // restore registers.
         ld ra, 0(sp)
@@ -83,6 +86,7 @@ kernelvec:
         addi sp, sp, 256
 
         // return to whatever we were doing in the kernel.
+        // 将sepc寄存器复制到pc还原中断前的pc
         sret
 
         #

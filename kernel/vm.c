@@ -91,6 +91,7 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
 // Look up a virtual address, return the physical address,
 // or 0 if not mapped.
 // Can only be used to look up user pages.
+// 将用户页表pagetable中的虚拟地址srcva复制到dst，需指定最大复制字节数
 uint64
 walkaddr(pagetable_t pagetable, uint64 va)
 {
@@ -100,6 +101,8 @@ walkaddr(pagetable_t pagetable, uint64 va)
   if(va >= MAXVA)
     return 0;
 
+  // 使用walk在软件中模拟分页用剑的操作，确定srcva的物理地址pa0
+  // 下面会检查用户提供的虚拟地址是否是进程用户地址空间的一部分，所以程序不能欺骗内核读取其他内存。
   pte = walk(pagetable, va, 0);
   if(pte == 0)
     return 0;

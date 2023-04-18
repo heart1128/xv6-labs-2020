@@ -21,6 +21,8 @@ fetchaddr(uint64 addr, uint64 *ip)
 
 // Fetch the nul-terminated string at addr from the current process.
 // Returns length of string, not including nul, or -1 for error.
+// 安全地将数据复制到用户提供的地址或从用户提供的地址复制数据的函数
+// exec使用这个函数从用户空间中检索字符串文件名参数。
 int
 fetchstr(uint64 addr, char *buf, int max)
 {
@@ -31,6 +33,8 @@ fetchstr(uint64 addr, char *buf, int max)
   return strlen(buf);
 }
 
+// 在寄存器中拿出参数
+// called argint()、argaddr()、argfd()
 static uint64
 argraw(int n)
 {

@@ -13,8 +13,9 @@
 trampoline:
 .align 4
 .globl uservec
-uservec:    
+uservec:
 	#
+        // 来自用户空间的trap的处理路径 uservec
         # trap.c sets stvec to point here, so
         # traps from user space start here,
         # in supervisor mode, but with a
@@ -26,6 +27,7 @@ uservec:
         
 	# swap a0 and sscratch
         # so that a0 is TRAPFRAME
+        // sscratch寄存器存放处理程序开始时可以使用的值,现在进行和a0交换,也就是a0保存了这个值
         csrrw a0, sscratch, a0
 
         # save the user registers in TRAPFRAME
@@ -74,6 +76,7 @@ uservec:
         ld t0, 16(a0)
 
         # restore kernel page table from p->trapframe->kernel_satp
+        # satp切换到内核页表,刷新TLB
         ld t1, 0(a0)
         csrw satp, t1
         sfence.vma zero, zero
@@ -86,6 +89,7 @@ uservec:
 
 .globl userret
 userret:
+        // 用户空间trap的过程 trampoline.S(16:uservec) -> usertrap(kernel/trap.c:37) -> userret
         # userret(TRAPFRAME, pagetable)
         # switch from kernel to user.
         # usertrapret() calls here.
@@ -138,4 +142,5 @@ userret:
         
         # return to user mode and user pc.
         # usertrapret() set up sstatus and sepc.
+        // return user sapce
         sret
