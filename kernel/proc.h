@@ -42,7 +42,7 @@ extern struct cpu cpus[NCPU];
 // return-to-user path via usertrapret() doesn't return through
 // the entire kernel call stack.
 struct trapframe {
-  /*   0 */ uint64 kernel_satp;   // kernel page table
+  /*   0 */ uint64 kernel_satp;   // kernel page table, trap处理代码切换到内核态需要将这个寄存器的内容加载到satp寄存器
   /*   8 */ uint64 kernel_sp;     // top of process's kernel stack
   /*  16 */ uint64 kernel_trap;   // usertrap()
   /*  24 */ uint64 epc;           // saved user program counter
@@ -50,7 +50,7 @@ struct trapframe {
   /*  40 */ uint64 ra;
   /*  48 */ uint64 sp;
   /*  56 */ uint64 gp;
-  /*  64 */ uint64 tp;
+  /*  64 */ uint64 tp;              // tp保存cpu核的编号
   /*  72 */ uint64 t0;
   /*  80 */ uint64 t1;
   /*  88 */ uint64 t2;

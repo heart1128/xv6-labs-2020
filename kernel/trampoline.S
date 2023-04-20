@@ -69,21 +69,23 @@ uservec:
         # restore kernel stack pointer from p->trapframe->kernel_sp
         ld sp, 8(a0)
 
+        // tp是保存了现在是使用cpu第几个核的数字
         # make tp hold the current hartid, from p->trapframe->kernel_hartid
         ld tp, 32(a0)
-
+        // t0保存处理用户trap的函数的地址，也就是usertrap
         # load the address of usertrap(), p->trapframe->kernel_trap
         ld t0, 16(a0)
 
         # restore kernel page table from p->trapframe->kernel_satp
-        # satp切换到内核页表,刷新TLB
-        ld t1, 0(a0)
+        // 向t1寄存器写入内核页表的地址
+        // satp切换到内核页表,刷新TLB
+ 8        ld t1, 0(a0)
         csrw satp, t1
         sfence.vma zero, zero
 
         # a0 is no longer valid, since the kernel page
         # table does not specially map p->tf.
-
+        // 跳转到t0寄存器的地址，t0寄存器在上面保存了usertrap函数的地址，所以开始执行这个函数。
         # jump to usertrap(), which does not return
         jr t0
 
@@ -97,11 +99,15 @@ userret:
         # a1: user page table, for satp.
 
         # switch to the user page table.
+        // 切换位用户页表
         csrw satp, a1
+        // 刷新TLB
         sfence.vma zero, zero
 
         # put the saved user a0 in sscratch, so we
         # can swap it with our a0 (TRAPFRAME) in the last step.
+        // 交换a0核sscratch寄存器，sscratch又保存回trampoline的地址了
+        //
         ld t0, 112(a0)
         csrw sscratch, t0
 
@@ -137,10 +143,16 @@ userret:
         ld t5, 272(a0)
         ld t6, 280(a0)
 
+    // 每次返回前会将trapframe page的地址存放回sscratch地址，下次中断又会把地址交换到a0
 	# restore user a0, and save TRAPFRAME in sscratch
+    // 交换之后a0的值是系统调用的返回值，sscratch是之前的trampoline的地址。
         csrrw a0, sscratch, a0
         
         # return to user mode and user pc.
         # usertrapret() set up sstatus and sepc.
         // return user sapce
+        // 程序切换回user mode
+        // sepc寄存器的数值会还原给pc，sepc是之前保存user进入中断的地址
+        // 打开中断，等待下一次中断。
+        //在sh.asm中可以看到，这指令是ret指令
         sret
