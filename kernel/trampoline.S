@@ -79,7 +79,7 @@ uservec:
         # restore kernel page table from p->trapframe->kernel_satp
         // 向t1寄存器写入内核页表的地址
         // satp切换到内核页表,刷新TLB
- 8        ld t1, 0(a0)
+        ld t1, 0(a0)
         csrw satp, t1
         sfence.vma zero, zero
 
