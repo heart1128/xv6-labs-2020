@@ -154,7 +154,7 @@ go(int which_child)
     } else if(what == 15){
       sbrk(6011);
       fc:	6a85                	lui	s5,0x1
-      fe:	77ba8a93          	addi	s5,s5,1915 # 177b <buf.1231+0x10b>
+      fe:	77ba8a93          	addi	s5,s5,1915 # 177b <buf.1234+0x10b>
      102:	a825                	j	13a <go+0xc2>
       close(open("grindir/../a", O_CREATE|O_RDWR));
      104:	20200593          	li	a1,514
@@ -454,7 +454,7 @@ go(int which_child)
       write(fd, buf, sizeof(buf));
      38e:	3e700613          	li	a2,999
      392:	00001597          	auipc	a1,0x1
-     396:	2de58593          	addi	a1,a1,734 # 1670 <buf.1231>
+     396:	2de58593          	addi	a1,a1,734 # 1670 <buf.1234>
      39a:	854a                	mv	a0,s2
      39c:	00001097          	auipc	ra,0x1
      3a0:	ae2080e7          	jalr	-1310(ra) # e7e <write>
@@ -462,7 +462,7 @@ go(int which_child)
       read(fd, buf, sizeof(buf));
      3a6:	3e700613          	li	a2,999
      3aa:	00001597          	auipc	a1,0x1
-     3ae:	2c658593          	addi	a1,a1,710 # 1670 <buf.1231>
+     3ae:	2c658593          	addi	a1,a1,710 # 1670 <buf.1234>
      3b2:	854a                	mv	a0,s2
      3b4:	00001097          	auipc	ra,0x1
      3b8:	ac2080e7          	jalr	-1342(ra) # e76 <read>

@@ -1900,7 +1900,7 @@ badarg(char *s)
   if(pid == 0){
     124a:	12051463          	bnez	a0,1372 <copyinstr2+0x1b8>
     124e:	00007797          	auipc	a5,0x7
-    1252:	dd278793          	addi	a5,a5,-558 # 8020 <big.1265>
+    1252:	dd278793          	addi	a5,a5,-558 # 8020 <big.1268>
     1256:	00008697          	auipc	a3,0x8
     125a:	dca68693          	addi	a3,a3,-566 # 9020 <__global_pointer$+0x920>
       big[i] = 'x';
@@ -3401,9 +3401,9 @@ badarg(char *s)
     20a4:	6145                	addi	sp,sp,48
     20a6:	8082                	ret
     20a8:	00006797          	auipc	a5,0x6
-    20ac:	e7878793          	addi	a5,a5,-392 # 7f20 <args.1802>
+    20ac:	e7878793          	addi	a5,a5,-392 # 7f20 <args.1805>
     20b0:	00006697          	auipc	a3,0x6
-    20b4:	f6868693          	addi	a3,a3,-152 # 8018 <args.1802+0xf8>
+    20b4:	f6868693          	addi	a3,a3,-152 # 8018 <args.1805+0xf8>
       args[i] = "bigargs test: failed\n                                                                                                                                                                                                       ";
     20b8:	00004717          	auipc	a4,0x4
     20bc:	65070713          	addi	a4,a4,1616 # 6708 <malloc+0xf5a>
@@ -3413,7 +3413,7 @@ badarg(char *s)
     20c4:	fed79ee3          	bne	a5,a3,20c0 <bigargtest+0x7c>
     args[MAXARG-1] = 0;
     20c8:	00006597          	auipc	a1,0x6
-    20cc:	e5858593          	addi	a1,a1,-424 # 7f20 <args.1802>
+    20cc:	e5858593          	addi	a1,a1,-424 # 7f20 <args.1805>
     20d0:	0e05bc23          	sd	zero,248(a1)
     exec("echo", args);
     20d4:	00004517          	auipc	a0,0x4

@@ -121,6 +121,11 @@ panic(char *s)
   printf("panic: ");
   printf(s);
   printf("\n");
+
+  // lab 4-2
+  // 调用打印函数的返回地址
+  backtrace();
+
   panicked = 1; // freeze uart output from other CPUs
   for(;;)
     ;
@@ -132,3 +137,33 @@ printfinit(void)
   initlock(&pr.lock, "pr");
   pr.locking = 1;
 }
+
+
+
+// lab4-2
+// backtrece()，不断循环输出当前函数的返回地址，直到到达该页表的起始地址。
+// lab4-2 添加backtrace函数打印
+void
+backtrace(void)
+{
+    // 取出存在s0寄存器的fp
+    uint64 fp = r_fp();
+    // printf("fp = %p\n", fp);
+    // 栈的地址是负的，因为栈是从高地址到低地址的，所以栈顶的的地址比栈底更小，所以栈地址是负的
+    // 向上调整到PGSIZE大小的倍数。栈最多一个PGSIZE，所以上调到PGSIZE的倍数肯定是PGSIZE
+    // RISC-V 的用户栈空间占一个页面，这里得到最高地址
+    uint64 top = PGROUNDUP(fp);
+    // printf("top = %p\n", top); 是负值，所以每次往下减会不超过top
+    printf("backtrace:\n");
+
+    // 不断循环直到顶
+    // 每次往栈里面读16字节，也就是下一个函数的fp
+    for(; fp < top; fp = *((uint64*)(fp-16)))
+    {
+        // 打印返回地址，存在fp-8的位置。
+        printf("%p\n", *((uint64*)(fp-8)));
+    }
+}
+
+
+

@@ -325,6 +325,18 @@ sfence_vma()
   asm volatile("sfence.vma zero, zero");
 }
 
+// lab4-2官方提示在这加r_fp()
+// fp是栈顶指针，sp是栈指针，从call.asm中知道fp是从s0寄存器中拿出来的，fp-8存放函数返回地址，fp-16存放调用函数的fp
+// 这个函数就是要读取s0也就是当前的栈帧fp,是官方给的代码
+static inline uint64
+r_fp()
+{
+    uint64 x;
+    // 拿s0到x中
+    asm volatile("mv %0, s0" : "=r" (x) );
+    return x;
+}
+
 
 #define PGSIZE 4096 // bytes per page
 #define PGSHIFT 12  // bits of offset within a page

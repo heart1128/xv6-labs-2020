@@ -52,6 +52,7 @@ sys_sbrk(void)
   return addr;
 }
 
+
 uint64
 sys_sleep(void)
 {
@@ -70,6 +71,11 @@ sys_sleep(void)
     sleep(&ticks, &tickslock);
   }
   release(&tickslock);
+
+  // lab4-2
+  // 测试是用sleep()系统调用测试的，所以在这里也打印
+  backtrace();
+
   return 0;
 }
 
