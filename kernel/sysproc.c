@@ -101,3 +101,48 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+
+// lab4-3添加对系统调用的实际函数实现
+uint64
+sys_sigalarm(void)
+{
+    // 将寄存器中的值取出，保存在当前进程的interval和handler中。
+    int interval;
+    uint64 handler; // 函数指针就是个地址
+    struct proc *p;
+
+    // 取出时间间隔，要求时间间隔非负,时间间隔为0是可以的，表示取消调用
+    // 取出0号寄存器和1号寄存器的地址
+    if(argint(0, &interval) < 0 || argaddr(1, &handler) < 0 || interval < 0)
+    {
+        return -1;
+    }
+
+    // 取出当前进程结构体，进行赋值
+    p = myproc();
+    p->interval = interval;
+    p->handler = handler;
+    p->passedticks = 0; // 重置时钟
+
+    return 0;
+}
+// lab4-3 test1/test2
+// 在trap.c的usertrap中保存了函数调用之前的寄存器，现在要返回用户空间的时候进行复原
+uint64
+sys_sigreturn(void)
+{
+    struct proc *p = myproc();
+    // 判断下地址，防止在没有进行复制副本之前调用这个系统调用
+    if(p->trapframecopy != p->trapframe + 512)
+    {
+        return -1;
+    }
+
+    // 进行还原
+    memmove(p->trapframe, p->trapframecopy, sizeof(struct trapframe));
+    p->passedticks = 0;
+    p->trapframecopy = 0;
+
+    return 0;
+}

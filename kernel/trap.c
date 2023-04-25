@@ -78,7 +78,6 @@ usertrap(void)
     // 进行系统调用。也就是找调用号进行sys_xxx()函数进行处理
     syscall();
   } else if((which_dev = devintr()) != 0){ // 如果是设备中断，devintr进行处理
-    // ok
   } else {  // 否则就是异常，内核直接杀死故障进程
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
@@ -89,7 +88,47 @@ usertrap(void)
   if(p->killed)
     exit(-1);
 
+    /*
+   * lab 4-3
+   *
+   *  时钟中断会进入usertrap中
+   *  首先判断interval==0，如果是0表示终止时钟调用，
+   *  再判断passedticks是不是等于interval，如果相等表示时间间隔到了，要执行handler()
+   *
+   *  因为在trampoline.S的server中已经完成了页表的切换，现在的页表是内核页表，而
+   *  handler是用户空间下的函数虚拟地址，不能直接调用，所以利用p->trapfram->epc设置为p->handler，epc寄存器是保存用户PC的寄存器
+   *  这样在返回用户空间的时候，程序计数器被设置为handler的地址，就会执行函数。
+   *
+   */
+    // start lab 4-3 test0
+
+    // 判断是设备的时钟中断
+    if(which_dev == 2)
+    {
+        // 增加passed ticks
+        ++p->passedticks;
+        // 判断不为0和时间到
+        if(p->interval != 0 && p->passedticks == p->interval)
+        {
+            // lab 4-3 test1/test2
+            // 进行修改寄存器之前保存
+            // trapframe分配了一个页的大小(4096)，trapframe只用了288，所以后续还有空间可以使用。
+            // 后续的空间可以存副本，就不用浪费一个页的大小存放副本了
+            // 这里加上超过288，小于4096 - 288就行
+            p->trapframecopy = p->trapframe + 512;
+            // 进行字节流的复制
+            memmove(p->trapframecopy, p->trapframe, sizeof(struct trapframe));
+            // end test1/test2
+
+            p->passedticks = 0;
+            p->trapframe->epc = p->handler; // 存到用户空间的PC
+        }
+    }
+
+    // end lab 4-3
+
   // give up the CPU if this is a timer interrupt.
+  // 2是cpu的时钟中断
   if(which_dev == 2)
     yield();
 

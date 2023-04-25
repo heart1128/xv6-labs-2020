@@ -127,6 +127,13 @@ found:
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
 
+  // lab4-3 分配初始化进程的时候就要初始化新添加的三个值
+  p->interval = 0;
+  p->handler = 0;
+  p->passedticks = 0;
+  // lab4-3 test1/test2初始化
+  p->trapframecopy = 0;
+
   return p;
 }
 

@@ -36,3 +36,7 @@ entry("getpid");
 entry("sbrk");
 entry("sleep");
 entry("uptime");
+# lab 4-3 添加在user.h中对应的系统调用
+entry("sigalarm");
+entry("sigreturn");
+

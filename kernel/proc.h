@@ -103,4 +103,13 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+
+
+  // lab4-3 添加新的自字段，记录时间间隔和到了这个时间的函数指针。
+  int interval;                 // alarm interval
+  uint64 handler;               // 处理的函数指针
+  int passedticks;              // 自上次系统调用过了多少个"滴答",也就是ticks
+
+  // lab4-3 test1/test2
+  struct trapframe* trapframecopy;  // 副本，用于保留时钟中断调用hadnler之前的寄存器，这些寄存器也就是在中断之前的用户空间的寄存器。
 };

@@ -124,6 +124,7 @@ panic(char *s)
 
   // lab 4-2
   // 调用打印函数的返回地址
+  // 出错的时候就会打印
   backtrace();
 
   panicked = 1; // freeze uart output from other CPUs

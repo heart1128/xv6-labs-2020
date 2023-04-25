@@ -20,3 +20,6 @@
 #define SYS_link   19
 #define SYS_mkdir  20
 #define SYS_close  21
+// lab4-3 系统调用的流程，在前面加了这里也要加系统调用号
+#define SYS_sigalarm 22
+#define SYS_sigreturn 23

@@ -39,6 +39,7 @@ periodic()
 
 // tests whether the kernel calls
 // the alarm handler even a single time.
+// 这个测试是测试系统调用的时钟中断
 void
 test0()
 {
