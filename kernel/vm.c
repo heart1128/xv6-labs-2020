@@ -183,7 +183,9 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
     if((pte = walk(pagetable, a, 0)) == 0)
       panic("uvmunmap: walk");
     if((*pte & PTE_V) == 0)
-      panic("uvmunmap: not mapped");
+        continue;  // lab5-2 这里会报错是因为在sbrk中只加了大小，没有映射，所以这部分在取消映射就会报错
+                    // 直接跳过是因为，xv6是设计好的，除了上面修改的部分会引起这个错误，其他不会，我们在usertrap已经处理了这个错误，直接跳过就行。
+        // panic("uvmunmap: not mapped");
     if(PTE_FLAGS(*pte) == PTE_V)
       panic("uvmunmap: not a leaf");
     if(do_free){

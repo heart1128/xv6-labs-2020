@@ -38,17 +38,29 @@ sys_wait(void)
   return wait(p);
 }
 
+/*
+ * lab5-1
+ * 对sbrk实行lazy分配，也就是在进行sbrk的时候
+ *  只改变sz大小，不实际分配物理内存，直到出现page fault的时候
+ *  进行处理分配
+ * */
 uint64
 sys_sbrk(void)
 {
   int addr;
   int n;
 
+  // 执行系统调用函数sbrk(n)
+  // 取出a0寄存器中的n参数
   if(argint(0, &n) < 0)
     return -1;
+  // 取出sz
   addr = myproc()->sz;
-  if(growproc(n) < 0)
-    return -1;
+
+  // lab5-1这里就是改的地方，不需要分配，直接改大小就行。
+  myproc()->sz += n;
+//  if(growproc(n) < 0)
+//    return -1;
   return addr;
 }
 

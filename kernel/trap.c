@@ -46,10 +46,10 @@ usertrap(void)
   w_stvec((uint64)kernelvec);
 
   struct proc *p = myproc();
-  
+
   // save user program counter.
   p->trapframe->epc = r_sepc();
-  
+
   if(r_scause() == 8){
     // system call
 
@@ -65,11 +65,45 @@ usertrap(void)
     intr_on();
 
     syscall();
-  } else if((which_dev = devintr()) != 0){
+  }
+  else if((which_dev = devintr()) != 0)
+  {
     // ok
-  } else {
+  }
+  else if(r_scause() == 15)
+  {
+  /*************** start lab 5-2 **********************/
+      // 1. 判断r_scause()也就是出错原因，根据5-1的出错原因直到echo的store的出错编号是15
+        // 同样判断有没有被杀死
+        if(p->killed)
+            exit(-1);
+
+        // 2. 本次出错的地址存放在r_stval寄存器中，取出来分配物理内存地址做映射
+        uint64 va = r_stval();
+        printf("page fault %p\n", va);
+        va = PGROUNDDOWN(va); // 将错误的虚拟地址下调到PGSIZE的倍数。因为echo是分配，sbrk增大的，va超过了原有的PGSIZE。
+
+        uint64 pa = (uint64)kalloc();  // 分配一个page的物理内存
+        if(pa == 0)   // 分配失败，也就是没有物理内存了，直接杀掉进程。
+        {
+            p->killed = 1;
+        }
+        else
+        {
+            memset((void*)pa, 0, PGSIZE); // 初始化
+            if(mappages(p->pagetable, va, PGSIZE, pa, PTE_U | PTE_R | PTE_W) != 0) // 映射缺失的物理地址到虚拟地址，设置权限。
+            {
+                // 映射失败，杀掉进程
+                kfree((void*)pa);
+                p->killed = 1;
+            }
+        }
+    }
+    //************* end lab 5-2 *********************
+  else
+  {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
-    printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+    printf("            sepc=%p  stval=%p\n", r_sepc(), r_stval());
     p->killed = 1;
   }
 
@@ -108,7 +142,7 @@ usertrapret(void)
 
   // set up the registers that trampoline.S's sret will use
   // to get to user space.
-  
+
   // set S Previous Privilege mode to User.
   unsigned long x = r_sstatus();
   x &= ~SSTATUS_SPP; // clear SPP to 0 for user mode
@@ -121,7 +155,7 @@ usertrapret(void)
   // tell trampoline.S the user page table to switch to.
   uint64 satp = MAKE_SATP(p->pagetable);
 
-  // jump to trampoline.S at the top of memory, which 
+  // jump to trampoline.S at the top of memory, which
   // switches to the user page table, restores user registers,
   // and switches to user mode with sret.
   uint64 fn = TRAMPOLINE + (userret - trampoline);
@@ -130,14 +164,14 @@ usertrapret(void)
 
 // interrupts and exceptions from kernel code go here via kernelvec,
 // on whatever the current kernel stack is.
-void 
+void
 kerneltrap()
 {
   int which_dev = 0;
   uint64 sepc = r_sepc();
   uint64 sstatus = r_sstatus();
   uint64 scause = r_scause();
-  
+
   if((sstatus & SSTATUS_SPP) == 0)
     panic("kerneltrap: not from supervisor mode");
   if(intr_get() != 0)
@@ -207,7 +241,7 @@ devintr()
     if(cpuid() == 0){
       clockintr();
     }
-    
+
     // acknowledge the software interrupt by clearing
     // the SSIP bit in sip.
     w_sip(r_sip() & ~2);
