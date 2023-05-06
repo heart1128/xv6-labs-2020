@@ -70,7 +70,7 @@ usertrap(void)
   {
     // ok
   }
-  else if(r_scause() == 15)
+  else if(r_scause() == 15 || r_scause() == 13)
   {
   /*************** start lab 5-2 **********************/
       // 1. 判断r_scause()也就是出错原因，根据5-1的出错原因直到echo的store的出错编号是15
@@ -80,16 +80,22 @@ usertrap(void)
 
         // 2. 本次出错的地址存放在r_stval寄存器中，取出来分配物理内存地址做映射
         uint64 va = r_stval();
-        printf("page fault %p\n", va);
-        va = PGROUNDDOWN(va); // 将错误的虚拟地址下调到PGSIZE的倍数。因为echo是分配，sbrk增大的，va超过了原有的PGSIZE。
-
         uint64 pa = (uint64)kalloc();  // 分配一个page的物理内存
+        printf("page fault %p\n", va);
+
+
         if(pa == 0)   // 分配失败，也就是没有物理内存了，直接杀掉进程。
         {
             p->killed = 1;
         }
+        else if(va >= p->sz || va <= PGROUNDDOWN(p->trapframe->sp)) // lab 5-3 如果访问的虚拟地址超过了进程的记录大小，或者经过下调之后差超出了guard的越界地址就杀掉进程。sp是栈顶指针
+        {
+            kfree((void*)pa); // 失败就释放物理内存。
+            p->killed = 1;
+        }
         else
         {
+            va = PGROUNDDOWN(va); // 将错误的虚拟地址下调到PGSIZE的倍数。因为echo是分配，sbrk增大的，va超过了原有的PGSIZE。
             memset((void*)pa, 0, PGSIZE); // 初始化
             if(mappages(p->pagetable, va, PGSIZE, pa, PTE_U | PTE_R | PTE_W) != 0) // 映射缺失的物理地址到虚拟地址，设置权限。
             {
@@ -217,11 +223,13 @@ devintr()
     // this is a supervisor external interrupt, via PLIC.
 
     // irq indicates which device interrupted.
+    // 当前CPU核告知PLIC，自己要处理中断。返回一个中断号，UART的中断号是10
     int irq = plic_claim();
 
+    // 如果是UART中断，就调用uartintr函数。从UART的寄存器中读取数据
     if(irq == UART0_IRQ){
       uartintr();
-    } else if(irq == VIRTIO0_IRQ){
+    } else if(irq == VIRTIO0_IRQ){  // 外部IO中断
       virtio_disk_intr();
     } else if(irq){
       printf("unexpected interrupt irq=%d\n", irq);

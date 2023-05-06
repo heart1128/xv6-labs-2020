@@ -6,6 +6,7 @@
 
 static char digits[] = "0123456789ABCDEF";
 
+// 由shell输出的每一个字符都会触发一个write的系统调用，然后使用sys_write函数
 static void
 putc(int fd, char c)
 {

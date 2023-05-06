@@ -57,10 +57,23 @@ sys_sbrk(void)
   // 取出sz
   addr = myproc()->sz;
 
+    //lab 5-3
+    // 如果需要分配的数量超过了MAXVA也就是堆大小，也不能减去n小于0。否则就直接返回原大小，分配失败
+    if(addr + n >= MAXVA || addr + n <= 0)
+        return addr;
+
   // lab5-1这里就是改的地方，不需要分配，直接改大小就行。
-  myproc()->sz += n;
+  struct proc *p = myproc();
+  p->sz += n;
 //  if(growproc(n) < 0)
 //    return -1;
+
+    // lab5-3
+    // 如果传入的n是负数，那就需要直接释放空间
+    if(n < 0)
+    {
+        uvmdealloc(p->pagetable, addr, p->sz);
+    }
   return addr;
 }
 

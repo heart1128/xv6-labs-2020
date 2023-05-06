@@ -131,6 +131,7 @@ fileread(struct file *f, uint64 addr, int n)
 
 // Write to file f.
 // addr is a user virtual address.
+// 在sys_write()中被调用
 int
 filewrite(struct file *f, uint64 addr, int n)
 {
@@ -138,11 +139,11 @@ filewrite(struct file *f, uint64 addr, int n)
 
   if(f->writable == 0)
     return -1;
-
+    // 1. 判断文件描述符的类型
   if(f->type == FD_PIPE){
     ret = pipewrite(f->pipe, addr, n);
-  } else if(f->type == FD_DEVICE){
-    if(f->major < 0 || f->major >= NDEV || !devsw[f->major].write)
+  } else if(f->type == FD_DEVICE){ // 2. 在前面mknod生成的文件是设备文件(FD_DEVICE)
+    if(f->major < 0 || f->major >= NDEV || !devsw[f->major].write) // 执行特定的write函数，如果是console设备，就执行console.c中的consolewrite函数
       return -1;
     ret = devsw[f->major].write(1, addr, n);
   } else if(f->type == FD_INODE){

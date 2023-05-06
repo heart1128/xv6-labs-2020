@@ -268,6 +268,7 @@ fork(void)
   }
 
   // Copy user memory from parent to child.
+  // lab5-3 fork的时候回调用复制到子进程的页表，但是有些页是lazy分配，所以在里面报错要跳过
   if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
     freeproc(np);
     release(&np->lock);
@@ -462,6 +463,7 @@ scheduler(void)
   c->proc = 0;
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
+    // 使得CPU能接受中断。，中断完全打开
     intr_on();
     
     int nproc = 0;

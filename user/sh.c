@@ -130,10 +130,12 @@ runcmd(struct cmd *cmd)
   exit(0);
 }
 
+// shell程序
 int
 getcmd(char *buf, int nbuf)
 {
-  fprintf(2, "$ ");
+    // 文件描述符在main中打开了
+  fprintf(2, "$ ");    // 1. 输出一个$在stderr中，也就是在init.c中打开的
   memset(buf, 0, nbuf);
   gets(buf, nbuf);
   if(buf[0] == 0) // EOF
@@ -148,6 +150,7 @@ main(void)
   int fd;
 
   // Ensure that three file descriptors are open.
+  // 打开0，1，2文件描述符
   while((fd = open("console", O_RDWR)) >= 0){
     if(fd >= 3){
       close(fd);

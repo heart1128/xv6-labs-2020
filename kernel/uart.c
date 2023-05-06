@@ -41,9 +41,9 @@
 // the transmit output buffer.
 struct spinlock uart_tx_lock;
 #define UART_TX_BUF_SIZE 32
-char uart_tx_buf[UART_TX_BUF_SIZE];
-int uart_tx_w; // write next to uart_tx_buf[uart_tx_w++]
-int uart_tx_r; // read next from uart_tx_buf[uar_tx_r++]
+char uart_tx_buf[UART_TX_BUF_SIZE]; // buffer 由top部分(用户进程或者内核其他部分调用)从buffer中读写数据，bottom(中断处理)部分，同时向buffer中读写数据。
+int uart_tx_w; // write next to uart_tx_buf[uart_tx_w++] // 为生产者提供的写指针，buffer是一个环形队列
+int uart_tx_r; // read next from uart_tx_buf[uar_tx_r++] // 为消费者提供的读指针。
 
 extern volatile int panicked; // from printf.c
 
@@ -52,10 +52,10 @@ void uartstart();
 void
 uartinit(void)
 {
-  // disable interrupts.
+  // disable interrupts.        // 1. 关中断
   WriteReg(IER, 0x00);
 
-  // special mode to set baud rate.
+  // special mode to set baud rate.               // 2. 设置波特率（串口线的传输速率）
   WriteReg(LCR, LCR_BAUD_LATCH);
 
   // LSB for baud rate of 38.4K.
@@ -65,13 +65,13 @@ uartinit(void)
   WriteReg(1, 0x00);
 
   // leave set-baud mode,
-  // and set word length to 8 bits, no parity.
+  // and set word length to 8 bits, no parity.        // 3. 设置字符长度为8bit
   WriteReg(LCR, LCR_EIGHT_BITS);
 
-  // reset and enable FIFOs.
+  // reset and enable FIFOs.                                         // 4. 重置FIFO（队列buffer）
   WriteReg(FCR, FCR_FIFO_ENABLE | FCR_FIFO_CLEAR);
 
-  // enable transmit and receive interrupts.
+  // enable transmit and receive interrupts.                            // 5.重新打开中断。
   WriteReg(IER, IER_TX_ENABLE | IER_RX_ENABLE);
 
   initlock(&uart_tx_lock, "uart");
@@ -94,13 +94,16 @@ uartputc(int c)
   }
 
   while(1){
+      // 如果buffer满了，就进行一定时间的睡眠，等到有空间再使用，这里是包含在死循环里面的。
     if(((uart_tx_w + 1) % UART_TX_BUF_SIZE) == uart_tx_r){
       // buffer is full.
       // wait for uartstart() to open up space in the buffer.
       sleep(&uart_tx_r, &uart_tx_lock);
     } else {
+        // 将shell的字符$(c)送入buffer中
       uart_tx_buf[uart_tx_w] = c;
       uart_tx_w = (uart_tx_w + 1) % UART_TX_BUF_SIZE;
+      // 通知设备执行操作
       uartstart();
       release(&uart_tx_lock);
       return;
@@ -134,15 +137,17 @@ uartputc_sync(int c)
 // in the transmit buffer, send it.
 // caller must hold uart_tx_lock.
 // called from both the top- and bottom-half.
+// 将Shell存储在buffer中的任意字符送出。
 void
 uartstart()
 {
   while(1){
+      // 判断buffer是不是空的，如果是空的就不能进行传输字符操作了
     if(uart_tx_w == uart_tx_r){
       // transmit buffer is empty.
       return;
     }
-    
+    // 由一个THR寄存器保存要传输的字节，如果寄存器是满的，说明上一个字节还没有传走，就不能写入
     if((ReadReg(LSR) & LSR_TX_IDLE) == 0){
       // the UART transmit holding register is full,
       // so we cannot give it another byte.
@@ -155,7 +160,8 @@ uartstart()
     
     // maybe uartputc() is waiting for space in the buffer.
     wakeup(&uart_tx_r);
-    
+    // 写入到THR传输寄存器。告诉设备UART这里有一个字节需要发送，一旦数据送到了设备，系统调用会进行返回，用户
+    // 应用程序shell就可以继续执行。和trap的机制是一样的。UART发出也是靠外部设备的中断执行的。
     WriteReg(THR, c);
   }
 }
@@ -180,6 +186,7 @@ void
 uartintr(void)
 {
   // read and process incoming characters.
+  // 如果UART的接受寄存器中有数据，不断读取显示
   while(1){
     int c = uartgetc();
     if(c == -1)

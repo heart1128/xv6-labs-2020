@@ -261,6 +261,7 @@ r_time()
 static inline void
 intr_on()
 {
+    // 每个CPU都要设置自己的sstatus寄存器。设置一个bit打开或者关闭中断，这里通过SIE寄存器单独控制特定的中断。
   w_sstatus(r_sstatus() | SSTATUS_SIE);
 }
 

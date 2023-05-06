@@ -55,17 +55,19 @@ struct {
 //
 // user write()s to the console go here.
 //
+// 可以认为这个函数是UART驱动的top部分。
 int
-consolewrite(int user_src, uint64 src, int n)
+consolewrite(int user_src, uint64 src,[] int n)
 {
   int i;
 
   acquire(&cons.lock);
   for(i = 0; i < n; i++){
     char c;
+    // 将shell写入的字符拷贝
     if(either_copyin(&c, user_src, src+i, 1) == -1)
       break;
-    uartputc(c);
+    uartputc(c); // 将字符写入给UART设备
   }
   release(&cons.lock);
 
@@ -185,6 +187,7 @@ consoleinit(void)
 {
   initlock(&cons.lock, "cons");
 
+  // 配置UART芯片，这个芯片是传输外部中断的信号，bytes方式
   uartinit();
 
   // connect read and write system calls

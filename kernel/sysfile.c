@@ -84,7 +84,7 @@ sys_write(void)
   struct file *f;
   int n;
   uint64 p;
-
+    // 参数检查
   if(argfd(0, 0, &f) < 0 || argint(2, &n) < 0 || argaddr(1, &p) < 0)
     return -1;
 

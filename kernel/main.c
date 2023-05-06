@@ -11,7 +11,7 @@ void
 main()
 {
   if(cpuid() == 0){
-    consoleinit();
+    consoleinit();   // 初始化console
     printfinit();
     printf("\n");
     printf("xv6 kernel is booting\n");
@@ -22,7 +22,9 @@ main()
     procinit();      // process table
     trapinit();      // trap vectors
     trapinithart();  // install kernel trap vector
-    plicinit();      // set up interrupt controller
+      // 处理器上是通过Platform Level Interrupt Control，简称PLIC来处理设备中断，需要对他进行编程
+    plicinit();      // set up interrupt controller，// 上面设置了urta中断，但是没有对PLIC编程，所以CPU没法设置中断，这里对PLIC编程
+    //plicinit是由0号CPU运行，之后，每个CPU的核都需要调用plicinithart函数表明对于哪些外设中断感兴趣。
     plicinithart();  // ask PLIC for device interrupts
     binit();         // buffer cache
     iinit();         // inode cache
@@ -38,8 +40,9 @@ main()
     printf("hart %d starting\n", cpuid());
     kvminithart();    // turn on paging
     trapinithart();   // install kernel trap vector
+
     plicinithart();   // ask PLIC for device interrupts
   }
 
-  scheduler();        
+  scheduler();   // 设置cpu中断执行进程
 }

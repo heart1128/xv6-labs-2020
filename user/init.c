@@ -11,17 +11,19 @@
 
 char *argv[] = { "sh", 0 };
 
+// 系统启动之后运行的第一个进程。
 int
 main(void)
 {
   int pid, wpid;
 
+  // 1. 创建一个代表Console的设备。
   if(open("console", O_RDWR) < 0){
-    mknod("console", CONSOLE, 0);
-    open("console", O_RDWR);
+    mknod("console", CONSOLE, 0); // 创建
+    open("console", O_RDWR);       // 打开
   }
-  dup(0);  // stdout
-  dup(0);  // stderr
+  dup(0);  // stdout              // dup得到描述符1指向
+  dup(0);  // stderr                // 2
 
   for(;;){
     printf("init: starting sh\n");
