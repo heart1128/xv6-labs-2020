@@ -17,6 +17,7 @@ struct entry *table[NBUCKET];
 int keys[NKEYS];
 int nthread = 1;
 
+
 double
 now()
 {
@@ -35,9 +36,22 @@ insert(int key, int value, struct entry **p, struct entry *n)
   *p = e;
 }
 
+// lab 7-2
+// 创建互斥锁，根据提示每个散列桶都加一个锁
+pthread_mutex_t lock[NBUCKET];
+
+// 加哈希值
 static 
 void put(int key, int value)
 {
+
+    // lab 7-2
+    // 这里如果是两个线程同时执行，并且在上面的key % NBUCKET中拿到了同样的i
+    // 那么前一个执行insert的线程执行之后，后一个线程接着执行，插入新的值覆盖了前一个
+    // 线程插入的值，所以下一次前一个线程查询的时候就会出现在这个key上找的值不是插入的值
+    // 就会出现key miss
+    // 所以这里需要加一个线程 互斥锁。
+
   int i = key % NBUCKET;
 
   // is the key already present?
@@ -51,7 +65,11 @@ void put(int key, int value)
     e->value = value;
   } else {
     // the new is new.
+    // lab 7-2
+    // 每个key,也就是每个散列桶使用都要上锁
+      pthread_mutex_lock(&lock[i]);
     insert(key, value, &table[i], table[i]);
+      pthread_mutex_unlock(&lock[i]);
   }
 }
 

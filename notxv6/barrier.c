@@ -30,7 +30,32 @@ barrier()
   // Block until all threads have called barrier() and
   // then increment bstate.round.
   //
-  
+  // lab 7-3
+  // 保证所有的线程都进入这函数进行睡眠等待，算一轮
+  // 保证下一个round的操作不会影响到上一个还没有结束的round
+  // 进入一个，如果不是所有线程都进入了，就进行随眠等待，如果是，就全部唤醒，计数清零就行。
+
+  // 1. 申请互斥锁
+    pthread_mutex_lock(&bstate.barrier_mutex);
+
+    bstate.nthread++; // 进入barrier的线程计数
+    if(bstate.nthread == nthread) //所有线程都进入过barrier，算一个round
+    {
+        bstate.round++;
+        bstate.nthread = 0;
+        // 所有线程都进入了barrier之后就进行全部唤醒。
+        pthread_cond_broadcast(&bstate.barrier_cond);
+    }
+    else
+    {
+        // 不是所有线程都进入了，进行睡眠，等待唤醒
+        // barrier_mutex这个锁要提前持有。
+        // 等待条件，直到唤醒，加锁是为了防止多个线程同时请求
+        pthread_cond_wait(&bstate.barrier_cond, &bstate.barrier_mutex);
+    }
+
+    // 释放锁
+    pthread_mutex_unlock(&bstate.barrier_mutex);
 }
 
 static void *
@@ -43,7 +68,7 @@ thread(void *xa)
   for (i = 0; i < 20000; i++) {
     int t = bstate.round;
     assert (i == t);
-    barrier();
+    barrier(); // 每次进入一个线程
     usleep(random() % 100);
   }
 
